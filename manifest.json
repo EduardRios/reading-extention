@@ -1,0 +1,14 @@
+{
+    "name": "Reading extension",
+    "version": "1.0",
+    "manifest_version": 3,
+    "description": "Reads text from the page (preview, edit, TTS)",
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "storage"
+    ],
+    "action": {
+        "default_popup": "popup.html"
+    }
+}
