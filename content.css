@@ -1,0 +1,11 @@
+/* For Stage 1: Pre-highlighting the detected article */
+.reading-extension-highlight {
+  background-color: #fefed5 !important;
+  color: #000000 !important;
+}
+
+/* For Stage 2: Highlighting the active word being read */
+.reading-extension-active-word {
+  background-color: #ffd58b !important;
+  color: #000000 !important;
+}
