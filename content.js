@@ -1,7 +1,7 @@
 if (!window.contentScriptLoaded) {
   window.contentScriptLoaded = true;
 
-  // Helper function to remove existing highlights and IDs
+  //remove existing highlights and IDs
   const clearHighlights = () => {
     // Remove highlight class from all elements
     const highlightedElements = document.querySelectorAll('.reading-extension-highlight');
@@ -28,8 +28,8 @@ if (!window.contentScriptLoaded) {
       const documentClone = document.cloneNode(true);
       const article = new Readability(documentClone).parse();
 
+      //Parse the article HTML to find the IDs
       if (article && article.content) {
-        //Parse the article HTML to find the IDs
         const parser = new DOMParser();
         const articleDoc = parser.parseFromString(article.content, 'text/html');
         const articleElementsWithId = articleDoc.querySelectorAll('[data-reading-id]');
