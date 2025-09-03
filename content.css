@@ -1,7 +1,40 @@
-/* For Stage 1: Pre-highlighting the detected article */
+/* Style for the elements selected by Readability */
 .reading-extension-highlight {
-  background-color: #fefed5 !important;
-  color: #000000 !important;
+  position: relative; /* This is crucial for positioning the delete button */
+  outline: 2px solid #FFD700 !important;
+  outline-offset: 2px;
+}
+
+/* Style for the delete button itself */
+.reading-extension-delete-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 22px;
+  height: 22px;
+  background: #dc3545;
+  color: white;
+  border: 1px solid white;
+  border-radius: 50%;
+  cursor: pointer;
+  font-family: sans-serif;
+  font-weight: bold;
+  text-align: center;
+  line-height: 20px;
+  z-index: 9999;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.reading-extension-delete-btn:hover {
+  opacity: 1;
+}
+
+/* A class to apply when an element is "ignored" by the user */
+.reading-extension-ignored {
+  text-decoration: line-through;
+  opacity: 0.5;
+  background-color: #f0f0f0 !important; /* Override the highlight color */
 }
 
 /* For Stage 2: Highlighting the active word being read */

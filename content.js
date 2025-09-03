@@ -1,58 +1,82 @@
 if (!window.contentScriptLoaded) {
   window.contentScriptLoaded = true;
 
-  //remove existing highlights and IDs
-  const clearHighlights = () => {
-    // Remove highlight class from all elements
-    const highlightedElements = document.querySelectorAll('.reading-extension-highlight');
-    highlightedElements.forEach(el => el.classList.remove('reading-extension-highlight'));
-
-    // Clean up the temporary IDs from all elements
-    const taggedElements = document.querySelectorAll('[data-reading-id]');
-    taggedElements.forEach(el => el.removeAttribute('data-reading-id'));
-  }; 
+  // Helper function to remove all modifications
+  const clearAll = () => {
+    document.querySelectorAll('.reading-extension-highlight').forEach(el => el.classList.remove('reading-extension-highlight'));
+    document.querySelectorAll('.reading-extension-ignored').forEach(el => el.classList.remove('reading-extension-ignored'));
+    document.querySelectorAll('.reading-extension-delete-btn').forEach(btn => btn.remove());
+    document.querySelectorAll('[data-reading-id]').forEach(el => el.removeAttribute('data-reading-id'));
+  };
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     if (request.action === "highlightText") {
-      //Clear any previous highlights
-      clearHighlights();
+      clearAll();
 
-      // Tag all elements with a unique ID
       let elementIdCounter = 0;
       document.body.querySelectorAll('*').forEach(el => {
-        el.setAttribute('data-reading-id', ++elementIdCounter);
+        // Only tag elements that are visible and not scripts/styles
+        if (el.offsetParent !== null && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') {
+          el.setAttribute('data-reading-id', ++elementIdCounter);
+        }
       });
 
       //Clone the tagged document and parse with Readability
       const documentClone = document.cloneNode(true);
       const article = new Readability(documentClone).parse();
 
-      //Parse the article HTML to find the IDs
       if (article && article.content) {
         const parser = new DOMParser();
         const articleDoc = parser.parseFromString(article.content, 'text/html');
         const articleElementsWithId = articleDoc.querySelectorAll('[data-reading-id]');
         const idsToHighlight = Array.from(articleElementsWithId).map(el => el.getAttribute('data-reading-id'));
 
-        //Highlight  elements on page
+        const elementsToRead = [];
+
         idsToHighlight.forEach(id => {
           const elementToHighlight = document.querySelector(`[data-reading-id="${id}"]`);
-          if (elementToHighlight) {
+          // Ensure element exists and has meaningful text content
+          if (elementToHighlight && elementToHighlight.textContent.trim().length > 10) {
             elementToHighlight.classList.add('reading-extension-highlight');
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'X';
+            deleteBtn.className = 'reading-extension-delete-btn';
+            deleteBtn.title = 'Do not read this section';
+            
+            deleteBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+
+              elementToHighlight.classList.remove('reading-extension-highlight');
+              elementToHighlight.classList.add('reading-extension-ignored');
+              deleteBtn.remove(); // Remove the button after click
+
+              chrome.runtime.sendMessage({
+                action: "removeTextById",
+                idToRemove: id
+              });
+            });
+
+            elementToHighlight.appendChild(deleteBtn);
+
+            elementsToRead.push({
+              id: id,
+              text: elementToHighlight.textContent.replace(/X$/, '').trim()
+            });
           }
         });
 
-        // Send the clean text to popup
         chrome.runtime.sendMessage({
-          action: "setText",
-          text: article.textContent
+          action: "setTextElements",
+          elements: elementsToRead
         });
       }
     }
 
     if (request.action === "clearHighlights") {
-      clearHighlights();
+      clearAll();
     }
   });
 }
