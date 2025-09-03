@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // Get all the buttons and controls from the HTML
   const detectButton = document.getElementById('detect');
   const clearButton = document.getElementById('clear');
   const previewTextarea = document.getElementById('preview');
@@ -10,55 +9,88 @@ document.addEventListener('DOMContentLoaded', () => {
   const rateInput = document.getElementById('rate');
   const pitchInput = document.getElementById('pitch');
 
-  //Detect and highlight button
+  let readableElements = [];
+  let currentTabId = null;
+
+  const updatePreview = () => {
+    previewTextarea.value = readableElements.map(el => el.text).join('\n\n');
+  };
+
+  const loadStateForTab = (tabId) => {
+    currentTabId = tabId;
+    const storageKey = tabId.toString();
+    chrome.storage.session.get([storageKey], (result) => {
+      if (chrome.runtime.lastError) {
+        console.error(chrome.runtime.lastError);
+        return;
+      }
+      if (result[storageKey]) {
+        readableElements = result[storageKey];
+        updatePreview();
+      }
+    });
+  };
+
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs.length > 0) {
+      loadStateForTab(tabs[0].id);
+    }
+  });
+
   detectButton.addEventListener('click', () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tabId = tabs[0].id;
+      currentTabId = tabId;
 
-      // Inject CSS first
-      chrome.scripting.insertCSS({
-        target: { tabId: tabId },
-        files: ['content.css']
-      }, () => {
+      chrome.scripting.insertCSS({ target: { tabId: tabId }, files: ['content.css'] }, () => {
         if (chrome.runtime.lastError) {
           previewTextarea.value = 'Error: ' + chrome.runtime.lastError.message;
-          console.error(chrome.runtime.lastError.message);
           return;
         }
 
-        // Then, use the Scripting API to inject the JS files
-        chrome.scripting.executeScript({
-          target: { tabId: tabId },
-          files: ['Readability.js', 'content.js']
-        }, () => {
-          // This callback runs after the files have been injected.
-          // Now it's safe to send the message.
+        chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['Readability.js', 'content.js'] }, () => {
           if (chrome.runtime.lastError) {
             previewTextarea.value = 'Error: ' + chrome.runtime.lastError.message;
-            console.error(chrome.runtime.lastError.message);
             return;
           }
-
           chrome.tabs.sendMessage(tabId, { action: 'highlightText' });
         });
       });
     });
   });
 
-  //Clear Button
   clearButton.addEventListener('click', () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs.length > 0) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: 'clearHighlights' });
-      }
-    });
+    if (currentTabId) {
+      chrome.tabs.sendMessage(currentTabId, { action: 'clearHighlights' });
+      chrome.storage.session.remove(currentTabId.toString());
+    }
     previewTextarea.value = "";
+    readableElements = [];
   });
 
-  //Set text in textArea
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "setText") {
-      previewTextarea.value = request.text;
+    if (!currentTabId) {
+      // If tab context is not set, try to get it from the sender.
+      if (sender.tab) {
+        currentTabId = sender.tab.id;
+      } else {
+        console.error("Received message without a tab context.");
+        return;
+      }
+    }
+    
+    const storageKey = currentTabId.toString();
+
+    if (request.action === "setTextElements") {
+      readableElements = request.elements;
+      updatePreview();
+      chrome.storage.session.set({ [storageKey]: readableElements });
+    }
+
+    if (request.action === "removeTextById") {
+      readableElements = readableElements.filter(el => el.id !== request.idToRemove);
+      updatePreview();
+      chrome.storage.session.set({ [storageKey]: readableElements });
     }
   });
 
