@@ -1,82 +1,51 @@
+// Use a flag to ensure the script is injected only once.
 if (!window.contentScriptLoaded) {
   window.contentScriptLoaded = true;
 
-  // Helper function to remove all modifications
-  const clearAll = () => {
-    document.querySelectorAll('.reading-extension-highlight').forEach(el => el.classList.remove('reading-extension-highlight'));
-    document.querySelectorAll('.reading-extension-ignored').forEach(el => el.classList.remove('reading-extension-ignored'));
-    document.querySelectorAll('.reading-extension-delete-btn').forEach(btn => btn.remove());
-    document.querySelectorAll('[data-reading-id]').forEach(el => el.removeAttribute('data-reading-id'));
-  };
+  let selectionEnabled = false;
 
+  // 1. Listen for the message from the popup to enter selection mode.
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "enterSelectionMode") {
+      selectionEnabled = true;
+      // Add a class to the body to give visual feedback (e.g., change cursor).
+      document.body.classList.add('selection-mode-active');
 
-    if (request.action === "highlightText") {
-      clearAll();
-
-      let elementIdCounter = 0;
-      document.body.querySelectorAll('*').forEach(el => {
-        // Only tag elements that are visible and not scripts/styles
-        if (el.offsetParent !== null && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') {
-          el.setAttribute('data-reading-id', ++elementIdCounter);
-        }
-      });
-
-      //Clone the tagged document and parse with Readability
-      const documentClone = document.cloneNode(true);
-      const article = new Readability(documentClone).parse();
-
-      if (article && article.content) {
-        const parser = new DOMParser();
-        const articleDoc = parser.parseFromString(article.content, 'text/html');
-        const articleElementsWithId = articleDoc.querySelectorAll('[data-reading-id]');
-        const idsToHighlight = Array.from(articleElementsWithId).map(el => el.getAttribute('data-reading-id'));
-
-        const elementsToRead = [];
-
-        idsToHighlight.forEach(id => {
-          const elementToHighlight = document.querySelector(`[data-reading-id="${id}"]`);
-          // Ensure element exists and has meaningful text content
-          if (elementToHighlight && elementToHighlight.textContent.trim().length > 10) {
-            elementToHighlight.classList.add('reading-extension-highlight');
-
-            const deleteBtn = document.createElement('button');
-            deleteBtn.textContent = 'X';
-            deleteBtn.className = 'reading-extension-delete-btn';
-            deleteBtn.title = 'Do not read this section';
-            
-            deleteBtn.addEventListener('click', (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-
-              elementToHighlight.classList.remove('reading-extension-highlight');
-              elementToHighlight.classList.add('reading-extension-ignored');
-              deleteBtn.remove(); // Remove the button after click
-
-              chrome.runtime.sendMessage({
-                action: "removeTextById",
-                idToRemove: id
-              });
-            });
-
-            elementToHighlight.appendChild(deleteBtn);
-
-            elementsToRead.push({
-              id: id,
-              text: elementToHighlight.textContent.replace(/X$/, '').trim()
-            });
-          }
-        });
-
-        chrome.runtime.sendMessage({
-          action: "setTextElements",
-          elements: elementsToRead
-        });
-      }
+      // Create a banner to inform the user they are in selection mode.
+      const banner = document.createElement('div');
+      banner.textContent = 'Selection Mode Active: Click and drag to select text.';
+      banner.id = 'reading-extension-banner';
+      document.body.appendChild(banner);
     }
 
     if (request.action === "clearHighlights") {
-      clearAll();
+      // This can be used to clear any visual styles if needed in the future.
+    }
+  });
+
+  // 2. Listen for the mouse up event to capture the selection.
+  document.addEventListener('mouseup', (event) => {
+    // Only act if selection mode is enabled.
+    if (selectionEnabled) {
+      const selectedText = window.getSelection().toString().trim();
+
+      // 3. If text was selected, send it to the popup.
+      if (selectedText) {
+        chrome.runtime.sendMessage({
+          action: "textSelected",
+          text: selectedText
+        });
+      }
+
+      // 4. Exit selection mode automatically after a selection is made.
+      selectionEnabled = false;
+      document.body.classList.remove('selection-mode-active');
+
+      // Remove the banner.
+      const banner = document.getElementById('reading-extension-banner');
+      if (banner) {
+        banner.remove();
+      }
     }
   });
 }

@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+  //references to all the buttons and inputs
   const detectButton = document.getElementById('detect');
   const clearButton = document.getElementById('clear');
   const previewTextarea = document.getElementById('preview');
@@ -9,91 +10,63 @@ document.addEventListener('DOMContentLoaded', () => {
   const rateInput = document.getElementById('rate');
   const pitchInput = document.getElementById('pitch');
 
-  let readableElements = [];
   let currentTabId = null;
 
-  const updatePreview = () => {
-    previewTextarea.value = readableElements.map(el => el.text).join('\n\n');
-  };
+  // --- NEW, MORE RELIABLE LOGIC ---
+  // Get the target tabId from the URL query parameter passed by background.js
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabIdFromUrl = parseInt(urlParams.get('tabId'));
+    if (tabIdFromUrl) {
+      currentTabId = tabIdFromUrl;
+    } else {
+      throw new Error('Tab ID not found in URL');
+    }
+  } catch (e) {
+    previewTextarea.value = `Error: Could not determine the target tab. ${e.message}`;
+    // Disable the button if we don't have a target.
+    detectButton.disabled = true;
+  }
 
-  const loadStateForTab = (tabId) => {
-    currentTabId = tabId;
-    const storageKey = tabId.toString();
-    chrome.storage.session.get([storageKey], (result) => {
+  // When "Select Text" is clicked, use the tab ID we got from the URL
+  detectButton.addEventListener('click', () => {
+    if (!currentTabId) {
+      previewTextarea.value = "Error: No valid Tab ID to operate on.";
+      return;
+    }
+
+    // Ensure our scripts are injected into the correct tab.
+    chrome.scripting.insertCSS({ target: { tabId: currentTabId }, files: ['content.css'] }, () => {
+        if (chrome.runtime.lastError) {
+            console.error(chrome.runtime.lastError.message);
+        }
+    });
+    chrome.scripting.executeScript({ target: { tabId: currentTabId }, files: ['content.js'] }, () => {
       if (chrome.runtime.lastError) {
-        console.error(chrome.runtime.lastError);
+        previewTextarea.value = 'Error: ' + chrome.runtime.lastError.message;
         return;
       }
-      if (result[storageKey]) {
-        readableElements = result[storageKey];
-        updatePreview();
-      }
-    });
-  };
-
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs.length > 0) {
-      loadStateForTab(tabs[0].id);
-    }
-  });
-
-  detectButton.addEventListener('click', () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tabId = tabs[0].id;
-      currentTabId = tabId;
-
-      chrome.scripting.insertCSS({ target: { tabId: tabId }, files: ['content.css'] }, () => {
-        if (chrome.runtime.lastError) {
-          previewTextarea.value = 'Error: ' + chrome.runtime.lastError.message;
-          return;
-        }
-
-        chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['Readability.js', 'content.js'] }, () => {
-          if (chrome.runtime.lastError) {
-            previewTextarea.value = 'Error: ' + chrome.runtime.lastError.message;
-            return;
-          }
-          chrome.tabs.sendMessage(tabId, { action: 'highlightText' });
-        });
-      });
+      // After ensuring the script is ready, tell it to enter selection mode.
+      chrome.tabs.sendMessage(currentTabId, { action: 'enterSelectionMode' });
     });
   });
 
+  // Clear button functionality
   clearButton.addEventListener('click', () => {
     if (currentTabId) {
       chrome.tabs.sendMessage(currentTabId, { action: 'clearHighlights' });
-      chrome.storage.session.remove(currentTabId.toString());
     }
     previewTextarea.value = "";
-    readableElements = [];
   });
 
+  // Listen for the selected text coming back from the content script
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (!currentTabId) {
-      // If tab context is not set, try to get it from the sender.
-      if (sender.tab) {
-        currentTabId = sender.tab.id;
-      } else {
-        console.error("Received message without a tab context.");
-        return;
-      }
-    }
-    
-    const storageKey = currentTabId.toString();
-
-    if (request.action === "setTextElements") {
-      readableElements = request.elements;
-      updatePreview();
-      chrome.storage.session.set({ [storageKey]: readableElements });
-    }
-
-    if (request.action === "removeTextById") {
-      readableElements = readableElements.filter(el => el.id !== request.idToRemove);
-      updatePreview();
-      chrome.storage.session.set({ [storageKey]: readableElements });
+    if (request.action === "textSelected") {
+      previewTextarea.value = request.text;
     }
   });
 
+  // The TTS controls work as before
   readButton.addEventListener('click', () => {
     const text = previewTextarea.value;
     if (text) {
@@ -101,9 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
       chrome.tts.speak(text, {
         rate: parseFloat(rateInput.value),
         pitch: parseFloat(pitchInput.value),
-        onEvent: (event) => {
-          // This is where we will add the highlighting logic later
-        }
       });
     }
   });
