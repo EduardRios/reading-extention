@@ -4,6 +4,7 @@ if (!window.contentScriptLoaded) {
 
   let selectionEnabled = false;
   const HIGHLIGHT_CLASS = 'reading-extension-selection-highlight';
+  const ACTIVE_WORD_CLASS = 'reading-extension-active-word';
 
   // Clears highlights by finding our specific spans and unwrapping them.
   function clearHighlights() {
@@ -21,11 +22,81 @@ if (!window.contentScriptLoaded) {
     });
   }
 
+  function clearActiveWordHighlight() {
+    const activeWord = document.querySelector(`span.${ACTIVE_WORD_CLASS}`);
+    if (activeWord) {
+        const parent = activeWord.parentNode;
+        if (parent) {
+            while (activeWord.firstChild) {
+                parent.insertBefore(activeWord.firstChild, activeWord);
+            }
+            parent.removeChild(activeWord);
+            parent.normalize();
+        }
+    }
+  }
+
+  function handleHighlightWord(charIndex) {
+      clearActiveWordHighlight();
+
+      const highlights = document.querySelectorAll(`span.${HIGHLIGHT_CLASS}`);
+      if (highlights.length === 0) return;
+
+      let currentLength = 0;
+      let found = false;
+
+      const textNodes = [];
+      highlights.forEach(h => {
+          const walker = document.createTreeWalker(h, NodeFilter.SHOW_TEXT);
+          let node;
+          while(node = walker.nextNode()) {
+              textNodes.push(node);
+          }
+      });
+
+      for (const node of textNodes) {
+          const text = node.nodeValue;
+          const nextLength = currentLength + text.length;
+
+          if (!found && charIndex >= currentLength && charIndex < nextLength) {
+              const startIndex = charIndex - currentLength;
+              
+              let endIndex = text.indexOf(' ', startIndex);
+              if (endIndex === -1) {
+                  endIndex = text.length;
+              }
+
+              if (text.substring(startIndex, endIndex).trim() === '') {
+                  currentLength = nextLength;
+                  continue;
+              }
+
+              const range = document.createRange();
+              range.setStart(node, startIndex);
+              range.setEnd(node, endIndex);
+
+              const span = document.createElement('span');
+              span.className = ACTIVE_WORD_CLASS;
+              
+              try {
+                  range.surroundContents(span);
+                  found = true;
+              } catch (e) {
+                  console.error("Reading Extension Error: Could not highlight word.", e);
+              }
+          }
+
+          if (found) break;
+          currentLength = nextLength;
+      }
+  }
+
   // Listen for messages from the popup.
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "enterSelectionMode") {
       // Clear any existing highlights as soon as we enter selection mode.
       clearHighlights();
+      clearActiveWordHighlight();
 
       selectionEnabled = true;
       document.body.classList.add('selection-mode-active');
@@ -38,6 +109,15 @@ if (!window.contentScriptLoaded) {
 
     if (request.action === "clearHighlights") {
       clearHighlights();
+      clearActiveWordHighlight();
+    }
+
+    if (request.action === "highlightWord") {
+      handleHighlightWord(request.charIndex);
+    }
+
+    if (request.action === "clearWordHighlight") {
+      clearActiveWordHighlight();
     }
   });
 

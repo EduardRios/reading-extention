@@ -78,7 +78,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (text) {
       chrome.tts.stop();
       chrome.tts.speak(text, {
-        rate: parseFloat(rateInput.value)
+        rate: parseFloat(rateInput.value),
+        onEvent: (event) => {
+          if (currentTabId) {
+            if (event.type === 'word') {
+              chrome.tabs.sendMessage(currentTabId, {
+                action: 'highlightWord',
+                charIndex: event.charIndex
+              });
+            } else if (event.type === 'end' || event.type === 'interrupted' || event.type === 'cancelled' || event.type === 'error') {
+              chrome.tabs.sendMessage(currentTabId, { action: 'clearWordHighlight' });
+            }
+          }
+        }
       });
     }
   });

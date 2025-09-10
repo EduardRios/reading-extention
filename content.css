@@ -1,4 +1,3 @@
-
 /* Styles for the new selection mode */
 body.selection-mode-active {
   cursor: crosshair !important;
@@ -24,4 +23,10 @@ body.selection-mode-active {
 .reading-extension-selection-highlight {
   background-color: #FFFF00 !important; /* Bright yellow */
   color: #000000 !important;
+}
+
+/* Style for the currently spoken word */
+.reading-extension-active-word {
+  background-color: #FF6347 !important; /* Tomato red */
+  color: #FFFFFF !important;
 }
