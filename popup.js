@@ -9,6 +9,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const pauseButton = document.getElementById('pause');
   const resumeButton = document.getElementById('resume');
   const rateInput = document.getElementById('rate');
+  const rateValue = document.getElementById('rate-value');
+
+  // Set initial rate value display and update on change
+  rateValue.textContent = parseFloat(rateInput.value).toFixed(1);
+  rateInput.addEventListener('input', (event) => {
+    rateValue.textContent = parseFloat(event.target.value).toFixed(1);
+  });
 
   let currentTabId = null;
 
