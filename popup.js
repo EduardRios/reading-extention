@@ -1,3 +1,5 @@
+//PopUp logic 
+
 document.addEventListener('DOMContentLoaded', () => {
   //references to all the buttons and inputs
   const detectButton = document.getElementById('detect');
@@ -6,13 +8,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const readButton = document.getElementById('read');
   const pauseButton = document.getElementById('pause');
   const resumeButton = document.getElementById('resume');
-  const stopButton = document.getElementById('stop');
   const rateInput = document.getElementById('rate');
-  const pitchInput = document.getElementById('pitch');
 
   let currentTabId = null;
 
-  // --- NEW, MORE RELIABLE LOGIC ---
   // Get the target tabId from the URL query parameter passed by background.js
   try {
     const urlParams = new URLSearchParams(window.location.search);
@@ -72,13 +71,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (text) {
       chrome.tts.stop();
       chrome.tts.speak(text, {
-        rate: parseFloat(rateInput.value),
-        pitch: parseFloat(pitchInput.value),
+        rate: parseFloat(rateInput.value)
       });
     }
   });
 
   pauseButton.addEventListener('click', () => chrome.tts.pause());
   resumeButton.addEventListener('click', () => chrome.tts.resume());
-  stopButton.addEventListener('click', () => chrome.tts.stop());
 });
