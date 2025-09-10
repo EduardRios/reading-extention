@@ -1,10 +1,10 @@
-/* Style for the elements selected by Readability */
 
 /* Styles for the new selection mode */
 body.selection-mode-active {
   cursor: crosshair !important;
 }
 
+/*Banner for selection mode*/
 #reading-extension-banner {
   position: fixed;
   top: 10px;
