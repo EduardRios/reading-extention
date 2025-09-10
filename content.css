@@ -1,47 +1,4 @@
 /* Style for the elements selected by Readability */
-.reading-extension-highlight {
-  position: relative; /* This is crucial for positioning the delete button */
-  outline: 2px solid #FFD700 !important;
-  outline-offset: 2px;
-}
-
-/* Style for the delete button itself */
-.reading-extension-delete-btn {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 22px;
-  height: 22px;
-  background: #dc3545;
-  color: white;
-  border: 1px solid white;
-  border-radius: 50%;
-  cursor: pointer;
-  font-family: sans-serif;
-  font-weight: bold;
-  text-align: center;
-  line-height: 20px;
-  z-index: 9999;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-}
-
-.reading-extension-delete-btn:hover {
-  opacity: 1;
-}
-
-/* A class to apply when an element is "ignored" by the user */
-.reading-extension-ignored {
-  text-decoration: line-through;
-  opacity: 0.5;
-  background-color: #f0f0f0 !important; /* Override the highlight color */
-}
-
-/* For Stage 2: Highlighting the active word being read */
-.reading-extension-active-word {
-  background-color: #ffd58b !important;
-  color: #000000 !important;
-}
 
 /* Styles for the new selection mode */
 body.selection-mode-active {
@@ -61,4 +18,10 @@ body.selection-mode-active {
   z-index: 10000;
   box-shadow: 0 4px 8px rgba(0,0,0,0.2);
   pointer-events: none; /* The banner should not be interactive */
+}
+
+/* Style for the user-selected text to be read */
+.reading-extension-selection-highlight {
+  background-color: #FFFF00 !important; /* Bright yellow */
+  color: #000000 !important;
 }
