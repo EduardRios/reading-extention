@@ -54,7 +54,11 @@ if (!window.contentScriptLoaded) {
           }
       });
 
-      for (const node of textNodes) {
+      for (const [i, node] of textNodes.entries()) {
+          if (i > 0) {
+              currentLength++; // Account for the space separator
+          }
+
           const text = node.nodeValue;
           const nextLength = currentLength + text.length;
 
@@ -189,10 +193,21 @@ if (!window.contentScriptLoaded) {
             highlightRange(range);
           }
 
+          const highlights = document.querySelectorAll(`.${HIGHLIGHT_CLASS}`);
+          const textNodes = [];
+          highlights.forEach(h => {
+              const walker = document.createTreeWalker(h, NodeFilter.SHOW_TEXT);
+              let node;
+              while(node = walker.nextNode()) {
+                  textNodes.push(node);
+              }
+          });
+          const textForTTS = textNodes.map(n => n.nodeValue).join(' ');
+
           // Always send the selected text.
           chrome.runtime.sendMessage({
             action: "textSelected",
-            text: selectedText
+            text: textForTTS
           });
 
         } catch (e) {
