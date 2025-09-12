@@ -10,6 +10,30 @@ document.addEventListener('DOMContentLoaded', () => {
   const resumeButton = document.getElementById('resume');
   const rateInput = document.getElementById('rate');
   const rateValue = document.getElementById('rate-value');
+  const voiceSelect = document.getElementById('voice');
+
+  let voices = [];
+
+  function populateVoiceList() {
+    chrome.tts.getVoices((availableVoices) => {
+      voices = availableVoices;
+      voiceSelect.innerHTML = '';
+      voices.forEach((voice, index) => {
+        const option = document.createElement('option');
+        option.textContent = `${voice.voiceName} (${voice.lang})`;
+        if (voice.default) {
+          option.textContent += ' — Default';
+        }
+        option.setAttribute('data-voice-name', voice.voiceName);
+        voiceSelect.appendChild(option);
+      });
+    });
+  }
+
+  populateVoiceList();
+  if (chrome.tts.onVoicesChanged) {
+    chrome.tts.onVoicesChanged.addListener(populateVoiceList);
+  }
 
   // Set initial rate value display and update on change
   rateValue.textContent = parseFloat(rateInput.value).toFixed(1);
@@ -76,8 +100,10 @@ document.addEventListener('DOMContentLoaded', () => {
   readButton.addEventListener('click', () => {
     const text = previewTextarea.value;
     if (text) {
+      const selectedVoiceName = voiceSelect.selectedOptions[0].getAttribute('data-voice-name');
       chrome.tts.stop();
       chrome.tts.speak(text, {
+        voiceName: selectedVoiceName,
         rate: parseFloat(rateInput.value),
         onEvent: (event) => {
           if (currentTabId) {
