@@ -20,11 +20,23 @@ document.addEventListener('DOMContentLoaded', () => {
       voiceSelect.innerHTML = '';
       voices.forEach((voice, index) => {
         const option = document.createElement('option');
-        option.textContent = `${voice.voiceName} (${voice.lang})`;
-        if (voice.default) {
-          option.textContent += ' — Default';
+        let textContent = `${voice.voiceName} (${voice.lang}`;
+
+        const supportsWordHighlight = voice.eventTypes && voice.eventTypes.includes('word');
+
+        if (supportsWordHighlight) {
+          textContent += ', sync';
         }
+
+        textContent += ')';
+
+        if (voice.default) {
+          textContent += ' — Default';
+        }
+
+        option.textContent = textContent;
         option.setAttribute('data-voice-name', voice.voiceName);
+        option.setAttribute('data-supports-highlight', supportsWordHighlight ? 'true' : 'false');
         voiceSelect.appendChild(option);
       });
     });
@@ -100,12 +112,17 @@ document.addEventListener('DOMContentLoaded', () => {
   readButton.addEventListener('click', () => {
     const text = previewTextarea.value;
     if (text) {
-      const selectedVoiceName = voiceSelect.selectedOptions[0].getAttribute('data-voice-name');
-      chrome.tts.stop();
-      chrome.tts.speak(text, {
+      const selectedOption = voiceSelect.selectedOptions[0];
+      const selectedVoiceName = selectedOption.getAttribute('data-voice-name');
+      const supportsHighlight = selectedOption.getAttribute('data-supports-highlight') === 'true';
+
+      const speakOptions = {
         voiceName: selectedVoiceName,
         rate: parseFloat(rateInput.value),
-        onEvent: (event) => {
+      };
+
+      if (supportsHighlight) {
+        speakOptions.onEvent = (event) => {
           if (currentTabId) {
             if (event.type === 'word') {
               chrome.tabs.sendMessage(currentTabId, {
@@ -116,8 +133,20 @@ document.addEventListener('DOMContentLoaded', () => {
               chrome.tabs.sendMessage(currentTabId, { action: 'clearWordHighlight' });
             }
           }
-        }
-      });
+        };
+      } else {
+        // If the voice doesn't support word highlighting, ensure we still clear the highlight when speech ends.
+        speakOptions.onEvent = (event) => {
+          if (event.type === 'end' || event.type === 'interrupted' || event.type === 'cancelled' || event.type === 'error') {
+            if (currentTabId) {
+              chrome.tabs.sendMessage(currentTabId, { action: 'clearWordHighlight' });
+            }
+          }
+        };
+      }
+
+      chrome.tts.stop();
+      chrome.tts.speak(text, speakOptions);
     }
   });
 
